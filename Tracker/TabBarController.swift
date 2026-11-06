@@ -1,5 +1,5 @@
 //
-//  NavigationBarController.swift
+//  TabBarController.swift
 //  Tracker
 //
 //  Created by Adilkhan on 21/10/26.
@@ -7,17 +7,26 @@
 
 import UIKit
 
-class TabBarController: UITabBarController {
+final class TabBarController: UITabBarController {
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupAppearance()
         viewControllers = [
-            makeTab(controller: TrackerViewController(), title: "Трекер", imageName: "circle_icon"),
+            makeTab(controller: TrackerViewController(), title: "Трекеры", imageName: "circle_icon"),
             makeTab(controller: StatisticsViewController(), title: "Статистика", imageName: "rabbit_icon")
         ]
-        
     }
-    
-    private func makeTab (controller: UIViewController, title: String, imageName: String) -> UINavigationController {
+
+    private func setupAppearance() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .white
+        tabBar.standardAppearance = appearance
+        tabBar.scrollEdgeAppearance = appearance
+        tabBar.tintColor = UIColor(resource: .blue)
+    }
+
+    private func makeTab(controller: UIViewController, title: String, imageName: String) -> UINavigationController {
         let navigationController = UINavigationController(rootViewController: controller)
         navigationController.navigationBar.prefersLargeTitles = true
         navigationController.tabBarItem = UITabBarItem(
