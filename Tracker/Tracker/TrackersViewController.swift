@@ -15,8 +15,10 @@ final class TrackersViewController: UIViewController {
         static let headerHeight: CGFloat = 46
     }
 
-    // Стек Core Data: из него будут создаваться Store трекеров, категорий и записей
-    private let coreDataStack: CoreDataStack
+    // Слой данных: контроллер работает только со Store и структурами, без Core Data
+    private let trackerStore: TrackerStore
+    private let categoryStore: TrackerCategoryStore
+    private let recordStore: TrackerRecordStore
 
     // Экрана выбора категории пока нет — все трекеры попадают в категорию по умолчанию
     private let defaultCategoryTitle = "Важное"
@@ -56,7 +58,9 @@ final class TrackersViewController: UIViewController {
     }()
 
     init(coreDataStack: CoreDataStack) {
-        self.coreDataStack = coreDataStack
+        self.trackerStore = TrackerStore(coreDataStack: coreDataStack)
+        self.categoryStore = TrackerCategoryStore(coreDataStack: coreDataStack)
+        self.recordStore = TrackerRecordStore(coreDataStack: coreDataStack)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -69,27 +73,42 @@ final class TrackersViewController: UIViewController {
         view.backgroundColor = .white
         buildAppBar()
         buildView()
+        loadData()
         filterTrackers()
     }
 
     // MARK: - Data
 
+    private func loadData() {
+        do {
+            categories = try categoryStore.fetchCategories()
+            completedTrackers = try recordStore.fetchRecords()
+        } catch {
+            print("Не удалось загрузить трекеры: \(error)")
+        }
+    }
+
     private func addTracker(_ tracker: Tracker, toCategory title: String) {
-        if categories.contains(where: { $0.title == title }) {
-            categories = categories.map {
-                $0.title == title ? TrackerCategory(title: $0.title, trackers: $0.trackers + [tracker]) : $0
-            }
-        } else {
-            categories = categories + [TrackerCategory(title: title, trackers: [tracker])]
+        do {
+            try trackerStore.addNewTracker(tracker, toCategoryWithTitle: title)
+            categories = try categoryStore.fetchCategories()
+        } catch {
+            print("Не удалось сохранить трекер: \(error)")
         }
     }
 
     private func toggleCompletion(of trackerId: UUID) {
         let record = makeRecord(for: trackerId)
-        if completedTrackers.contains(record) {
-            completedTrackers.remove(record)
-        } else {
-            completedTrackers.insert(record)
+        do {
+            if completedTrackers.contains(record) {
+                try recordStore.deleteRecord(record)
+                completedTrackers.remove(record)
+            } else {
+                try recordStore.addRecord(record)
+                completedTrackers.insert(record)
+            }
+        } catch {
+            print("Не удалось обновить отметку: \(error)")
         }
     }
 
