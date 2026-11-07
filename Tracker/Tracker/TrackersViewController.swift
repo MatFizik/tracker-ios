@@ -15,9 +15,12 @@ final class TrackersViewController: UIViewController {
         static let headerHeight: CGFloat = 46
     }
 
+    // Экрана выбора категории пока нет — все трекеры попадают в категорию по умолчанию
+    private let defaultCategoryTitle = "Важное"
+
     private var categories: [TrackerCategory] = []
     private var visibleCategories: [TrackerCategory] = []
-    private var completedTrackers: [TrackerRecord] = []
+    private var completedTrackers: Set<TrackerRecord> = []
     private var currentDate = Date()
 
     private let searchField: UISearchTextField = {
@@ -54,7 +57,6 @@ final class TrackersViewController: UIViewController {
         view.backgroundColor = .white
         buildAppBar()
         buildView()
-        addMockTrackers()
         filterTrackers()
     }
 
@@ -71,16 +73,21 @@ final class TrackersViewController: UIViewController {
     }
 
     private func toggleCompletion(of trackerId: UUID) {
-        let calendar = Calendar.current
-        if isCompleted(trackerId) {
-            completedTrackers.removeAll { $0.trackerId == trackerId && calendar.isDate($0.date, inSameDayAs: currentDate) }
+        let record = makeRecord(for: trackerId)
+        if completedTrackers.contains(record) {
+            completedTrackers.remove(record)
         } else {
-            completedTrackers.append(TrackerRecord(trackerId: trackerId, date: currentDate))
+            completedTrackers.insert(record)
         }
     }
 
     private func isCompleted(_ trackerId: UUID) -> Bool {
-        completedTrackers.contains { $0.trackerId == trackerId && Calendar.current.isDate($0.date, inSameDayAs: currentDate) }
+        completedTrackers.contains(makeRecord(for: trackerId))
+    }
+
+    // Дата записи — начало дня: так записи за один день совпадают в Set без линейного поиска
+    private func makeRecord(for trackerId: UUID) -> TrackerRecord {
+        TrackerRecord(trackerId: trackerId, date: Calendar.current.startOfDay(for: currentDate))
     }
 
     private func completedDays(for trackerId: UUID) -> Int {
@@ -98,7 +105,7 @@ final class TrackersViewController: UIViewController {
 
         visibleCategories = categories.compactMap { category in
             let trackers = category.trackers.filter { tracker in
-                let matchesDate = tracker.schedule.isEmpty || tracker.schedule.contains(weekday)
+                let matchesDate = tracker.schedule.contains(weekday)
                 let matchesSearch = searchText.isEmpty || tracker.name.lowercased().contains(searchText)
                 return matchesDate && matchesSearch
             }
@@ -109,50 +116,6 @@ final class TrackersViewController: UIViewController {
         collectionView.reloadData()
     }
 
-    // TODO: удалить, когда появится экран создания трекера
-    private func addMockTrackers() {
-        addTracker(
-            Tracker(
-                id: UUID(),
-                name: "Поливать растения",
-                color: UIColor(red: 51 / 255, green: 207 / 255, blue: 105 / 255, alpha: 1),
-                emoji: "❤️",
-                schedule: Set(Weekday.allCases)
-            ),
-            toCategory: "Домашний уют"
-        )
-        addTracker(
-            Tracker(
-                id: UUID(),
-                name: "Кошка заслонила камеру на созвоне",
-                color: UIColor(red: 255 / 255, green: 136 / 255, blue: 30 / 255, alpha: 1),
-                emoji: "😻",
-                schedule: [.monday, .wednesday, .friday]
-            ),
-            toCategory: "Радостные мелочи"
-        )
-        addTracker(
-            Tracker(
-                id: UUID(),
-                name: "Бабушка прислала открытку в вотсапе",
-                color: UIColor(red: 253 / 255, green: 76 / 255, blue: 73 / 255, alpha: 1),
-                emoji: "🌺",
-                schedule: [.saturday, .sunday]
-            ),
-            toCategory: "Радостные мелочи"
-        )
-        addTracker(
-            Tracker(
-                id: UUID(),
-                name: "Свидания в апреле",
-                color: UIColor(red: 0 / 255, green: 123 / 255, blue: 250 / 255, alpha: 1),
-                emoji: "🙂",
-                schedule: [.tuesday, .thursday]
-            ),
-            toCategory: "Радостные мелочи"
-        )
-    }
-
     // MARK: - UI
 
     private func buildAppBar() {
@@ -161,8 +124,8 @@ final class TrackersViewController: UIViewController {
         let addButton = UIBarButtonItem(
             image: UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(weight: .semibold)),
             style: .plain,
-            target: nil,
-            action: nil
+            target: self,
+            action: #selector(didTapAdd)
         )
         addButton.tintColor = .blackDay
         navigationItem.leftBarButtonItem = addButton
@@ -182,7 +145,7 @@ final class TrackersViewController: UIViewController {
             collectionView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 10),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
 
             emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             emptyStateView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
@@ -213,6 +176,21 @@ final class TrackersViewController: UIViewController {
     }
 
     @objc private func didChangeSearchText() {
+        filterTrackers()
+    }
+
+    @objc private func didTapAdd() {
+        let newHabitViewController = NewHabitViewController(categoryTitle: defaultCategoryTitle)
+        newHabitViewController.delegate = self
+        present(newHabitViewController, animated: true)
+    }
+}
+
+// MARK: - NewHabitViewControllerDelegate
+
+extension TrackersViewController: NewHabitViewControllerDelegate {
+    func newHabitViewController(_ controller: NewHabitViewController, didCreate tracker: Tracker) {
+        addTracker(tracker, toCategory: defaultCategoryTitle)
         filterTrackers()
     }
 }

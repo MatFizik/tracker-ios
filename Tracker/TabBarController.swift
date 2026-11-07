@@ -23,7 +23,7 @@ final class TabBarController: UITabBarController {
         appearance.backgroundColor = .white
         tabBar.standardAppearance = appearance
         tabBar.scrollEdgeAppearance = appearance
-        tabBar.tintColor = UIColor(resource: .blue)
+        tabBar.tintColor = UIColor.ypBlue
     }
 
     private func makeTab(controller: UIViewController, title: String, imageName: String) -> UINavigationController {
