@@ -58,8 +58,9 @@ final class TrackersViewController: UIViewController {
     }()
 
     init(coreDataStack: CoreDataStack) {
-        self.trackerStore = TrackerStore(coreDataStack: coreDataStack)
-        self.categoryStore = TrackerCategoryStore(coreDataStack: coreDataStack)
+        let categoryStore = TrackerCategoryStore(coreDataStack: coreDataStack)
+        self.categoryStore = categoryStore
+        self.trackerStore = TrackerStore(coreDataStack: coreDataStack, categoryStore: categoryStore)
         self.recordStore = TrackerRecordStore(coreDataStack: coreDataStack)
         super.init(nibName: nil, bundle: nil)
     }
@@ -73,25 +74,26 @@ final class TrackersViewController: UIViewController {
         view.backgroundColor = .white
         buildAppBar()
         buildView()
-        loadData()
-        filterTrackers()
+
+        trackerStore.delegate = self
+        categoryStore.delegate = self
+        recordStore.delegate = self
+        reloadFromStores()
     }
 
     // MARK: - Data
 
-    private func loadData() {
-        do {
-            categories = try categoryStore.fetchCategories()
-            completedTrackers = try recordStore.fetchRecords()
-        } catch {
-            print("Не удалось загрузить трекеры: \(error)")
-        }
+    // Берёт актуальные данные из Store. Вызывается при старте и каждый раз,
+    // когда NSFetchedResultsController сообщает об изменениях в Core Data.
+    private func reloadFromStores() {
+        categories = trackerStore.categories
+        completedTrackers = recordStore.records
+        filterTrackers()
     }
 
     private func addTracker(_ tracker: Tracker, toCategory title: String) {
         do {
             try trackerStore.addNewTracker(tracker, toCategoryWithTitle: title)
-            categories = try categoryStore.fetchCategories()
         } catch {
             print("Не удалось сохранить трекер: \(error)")
         }
@@ -102,10 +104,8 @@ final class TrackersViewController: UIViewController {
         do {
             if completedTrackers.contains(record) {
                 try recordStore.deleteRecord(record)
-                completedTrackers.remove(record)
             } else {
                 try recordStore.addRecord(record)
-                completedTrackers.insert(record)
             }
         } catch {
             print("Не удалось обновить отметку: \(error)")
@@ -331,7 +331,27 @@ extension TrackersViewController: TrackerCellDelegate {
         else { return }
 
         let tracker = visibleCategories[indexPath.section].trackers[indexPath.item]
+        // Экран обновится сам: TrackerRecordStore сообщит об изменении через делегата
         toggleCompletion(of: tracker.id)
-        collectionView.reloadItems(at: [indexPath])
+    }
+}
+
+// MARK: - Обновления из Core Data
+
+extension TrackersViewController: TrackerStoreDelegate {
+    func trackerStoreDidUpdate(_ store: TrackerStore) {
+        reloadFromStores()
+    }
+}
+
+extension TrackersViewController: TrackerCategoryStoreDelegate {
+    func trackerCategoryStoreDidUpdate(_ store: TrackerCategoryStore) {
+        reloadFromStores()
+    }
+}
+
+extension TrackersViewController: TrackerRecordStoreDelegate {
+    func trackerRecordStoreDidUpdate(_ store: TrackerRecordStore) {
+        reloadFromStores()
     }
 }

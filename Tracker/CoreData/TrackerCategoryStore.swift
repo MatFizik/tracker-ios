@@ -7,9 +7,17 @@
 
 import CoreData
 
+protocol TrackerCategoryStoreDelegate: AnyObject {
+    func trackerCategoryStoreDidUpdate(_ store: TrackerCategoryStore)
+}
+
 // Доступ к сущности TrackerCategoryCD. Наружу отдаёт только структуры TrackerCategory.
-final class TrackerCategoryStore {
+// Изменения в категориях отслеживает NSFetchedResultsController и сообщает о них делегату.
+final class TrackerCategoryStore: NSObject {
+    weak var delegate: TrackerCategoryStoreDelegate?
+
     private let context: NSManagedObjectContext
+    private let fetchedResultsController: NSFetchedResultsController<TrackerCategoryCD>
 
     convenience init(coreDataStack: CoreDataStack) {
         self.init(context: coreDataStack.context)
@@ -17,12 +25,29 @@ final class TrackerCategoryStore {
 
     init(context: NSManagedObjectContext) {
         self.context = context
+
+        let fetchRequest: NSFetchRequest<TrackerCategoryCD> = TrackerCategoryCD.fetchRequest()
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(key: #keyPath(TrackerCategoryCD.title), ascending: true)
+        ]
+        fetchedResultsController = NSFetchedResultsController(
+            fetchRequest: fetchRequest,
+            managedObjectContext: context,
+            sectionNameKeyPath: nil,
+            cacheName: nil
+        )
+        super.init()
+
+        fetchedResultsController.delegate = self
+        do {
+            try fetchedResultsController.performFetch()
+        } catch {
+            print("Не удалось загрузить категории: \(error)")
+        }
     }
 
-    func fetchCategories() throws -> [TrackerCategory] {
-        let request: NSFetchRequest<TrackerCategoryCD> = TrackerCategoryCD.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(key: #keyPath(TrackerCategoryCD.title), ascending: true)]
-        return try context.fetch(request).compactMap(makeCategory)
+    var categories: [TrackerCategory] {
+        fetchedResultsController.fetchedObjects?.compactMap(makeCategory) ?? []
     }
 
     // Находит категорию по названию или создаёт новую. Используется TrackerStore при создании трекера.
@@ -49,5 +74,13 @@ final class TrackerCategoryStore {
             .compactMap { $0.toTracker() }
             .sorted { $0.name < $1.name }
         return TrackerCategory(title: title, trackers: trackers)
+    }
+}
+
+// MARK: - NSFetchedResultsControllerDelegate
+
+extension TrackerCategoryStore: NSFetchedResultsControllerDelegate {
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        delegate?.trackerCategoryStoreDidUpdate(self)
     }
 }

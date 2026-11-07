@@ -7,10 +7,17 @@
 
 import CoreData
 
+protocol TrackerRecordStoreDelegate: AnyObject {
+    func trackerRecordStoreDidUpdate(_ store: TrackerRecordStore)
+}
+
 // Доступ к сущности TrackerRecordCD. Наружу отдаёт и принимает только структуры TrackerRecord.
-final class TrackerRecordStore {
+// Изменения в отметках отслеживает NSFetchedResultsController и сообщает о них делегату.
+final class TrackerRecordStore: NSObject {
+    weak var delegate: TrackerRecordStoreDelegate?
+
     private let context: NSManagedObjectContext
-    private let trackerStore: TrackerStore
+    private let fetchedResultsController: NSFetchedResultsController<TrackerRecordCD>
 
     convenience init(coreDataStack: CoreDataStack) {
         self.init(context: coreDataStack.context)
@@ -18,23 +25,40 @@ final class TrackerRecordStore {
 
     init(context: NSManagedObjectContext) {
         self.context = context
-        self.trackerStore = TrackerStore(context: context)
+
+        let fetchRequest: NSFetchRequest<TrackerRecordCD> = TrackerRecordCD.fetchRequest()
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(key: #keyPath(TrackerRecordCD.date), ascending: true)
+        ]
+        fetchedResultsController = NSFetchedResultsController(
+            fetchRequest: fetchRequest,
+            managedObjectContext: context,
+            sectionNameKeyPath: nil,
+            cacheName: nil
+        )
+        super.init()
+
+        fetchedResultsController.delegate = self
+        do {
+            try fetchedResultsController.performFetch()
+        } catch {
+            print("Не удалось загрузить отметки: \(error)")
+        }
     }
 
-    func fetchRecords() throws -> Set<TrackerRecord> {
-        let request: NSFetchRequest<TrackerRecordCD> = TrackerRecordCD.fetchRequest()
-        let records = try context.fetch(request).compactMap { recordCoreData -> TrackerRecord? in
+    var records: Set<TrackerRecord> {
+        let records = fetchedResultsController.fetchedObjects?.compactMap { recordCoreData -> TrackerRecord? in
             guard
                 let date = recordCoreData.date,
                 let trackerId = recordCoreData.tracker?.id
             else { return nil }
             return TrackerRecord(trackerId: trackerId, date: date)
         }
-        return Set(records)
+        return Set(records ?? [])
     }
 
     func addRecord(_ record: TrackerRecord) throws {
-        guard let trackerCoreData = try trackerStore.trackerCoreData(withId: record.trackerId) else { return }
+        guard let trackerCoreData = try trackerCoreData(withId: record.trackerId) else { return }
 
         let recordCoreData = TrackerRecordCD(context: context)
         recordCoreData.date = record.date
@@ -54,6 +78,14 @@ final class TrackerRecordStore {
         try saveContext()
     }
 
+    // Находит трекер, к которому нужно привязать запись
+    private func trackerCoreData(withId id: UUID) throws -> TrackerCD? {
+        let request: NSFetchRequest<TrackerCD> = TrackerCD.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        return try context.fetch(request).first
+    }
+
     private func saveContext() throws {
         do {
             try context.save()
@@ -61,5 +93,13 @@ final class TrackerRecordStore {
             context.rollback()
             throw error
         }
+    }
+}
+
+// MARK: - NSFetchedResultsControllerDelegate
+
+extension TrackerRecordStore: NSFetchedResultsControllerDelegate {
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        delegate?.trackerRecordStoreDidUpdate(self)
     }
 }

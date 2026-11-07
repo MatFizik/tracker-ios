@@ -8,18 +8,57 @@
 import CoreData
 import UIKit
 
-// Доступ к сущности TrackerCD. Наружу отдаёт и принимает только структуры Tracker.
-final class TrackerStore {
+protocol TrackerStoreDelegate: AnyObject {
+    func trackerStoreDidUpdate(_ store: TrackerStore)
+}
+
+final class TrackerStore: NSObject {
+    weak var delegate: TrackerStoreDelegate?
+
     private let context: NSManagedObjectContext
     private let categoryStore: TrackerCategoryStore
+    private let fetchedResultsController: NSFetchedResultsController<TrackerCD>
 
-    convenience init(coreDataStack: CoreDataStack) {
-        self.init(context: coreDataStack.context)
+    convenience init(coreDataStack: CoreDataStack, categoryStore: TrackerCategoryStore) {
+        self.init(context: coreDataStack.context, categoryStore: categoryStore)
     }
 
-    init(context: NSManagedObjectContext) {
+    init(context: NSManagedObjectContext, categoryStore: TrackerCategoryStore) {
         self.context = context
-        self.categoryStore = TrackerCategoryStore(context: context)
+        self.categoryStore = categoryStore
+
+        let fetchRequest: NSFetchRequest<TrackerCD> = TrackerCD.fetchRequest()
+        // Первая сортировка должна совпадать с sectionNameKeyPath
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(key: #keyPath(TrackerCD.category.title), ascending: true),
+            NSSortDescriptor(key: #keyPath(TrackerCD.name), ascending: true)
+        ]
+        fetchedResultsController = NSFetchedResultsController(
+            fetchRequest: fetchRequest,
+            managedObjectContext: context,
+            sectionNameKeyPath: #keyPath(TrackerCD.category.title),
+            cacheName: nil
+        )
+        super.init()
+
+        fetchedResultsController.delegate = self
+        do {
+            try fetchedResultsController.performFetch()
+        } catch {
+            print("Не удалось загрузить трекеры: \(error)")
+        }
+    }
+
+    // Секции контроллера — это категории, объекты внутри секции — трекеры этой категории
+    var categories: [TrackerCategory] {
+        guard let sections = fetchedResultsController.sections else { return [] }
+
+        return sections.compactMap { section in
+            let trackersCoreData = section.objects as? [TrackerCD] ?? []
+            let trackers = trackersCoreData.compactMap { $0.toTracker() }
+            guard !trackers.isEmpty else { return nil }
+            return TrackerCategory(title: section.name, trackers: trackers)
+        }
     }
 
     func addNewTracker(_ tracker: Tracker, toCategoryWithTitle categoryTitle: String) throws {
@@ -33,14 +72,6 @@ final class TrackerStore {
         try saveContext()
     }
 
-    // Находит трекер по id. Используется TrackerRecordStore, чтобы привязать запись к трекеру.
-    func trackerCoreData(withId id: UUID) throws -> TrackerCD? {
-        let request: NSFetchRequest<TrackerCD> = TrackerCD.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
-        request.fetchLimit = 1
-        return try context.fetch(request).first
-    }
-
     private func saveContext() throws {
         do {
             try context.save()
@@ -48,6 +79,14 @@ final class TrackerStore {
             context.rollback()
             throw error
         }
+    }
+}
+
+// MARK: - NSFetchedResultsControllerDelegate
+
+extension TrackerStore: NSFetchedResultsControllerDelegate {
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        delegate?.trackerStoreDidUpdate(self)
     }
 }
 
