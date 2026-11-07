@@ -15,6 +15,9 @@ final class TrackersViewController: UIViewController {
         static let headerHeight: CGFloat = 46
     }
 
+    // Стек Core Data: из него будут создаваться Store трекеров, категорий и записей
+    private let coreDataStack: CoreDataStack
+
     // Экрана выбора категории пока нет — все трекеры попадают в категорию по умолчанию
     private let defaultCategoryTitle = "Важное"
 
@@ -51,6 +54,15 @@ final class TrackersViewController: UIViewController {
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
+
+    init(coreDataStack: CoreDataStack) {
+        self.coreDataStack = coreDataStack
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
