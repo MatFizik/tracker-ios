@@ -20,8 +20,8 @@ final class NewHabitViewController: UIViewController {
 
         var title: String {
             switch self {
-            case .category: return "Категория"
-            case .schedule: return "Расписание"
+            case .category: "Категория"
+            case .schedule: "Расписание"
             }
         }
     }
@@ -137,8 +137,9 @@ final class NewHabitViewController: UIViewController {
         super.init(nibName: nil, bundle: nil)
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+        nil
     }
 
     override func viewDidLoad() {

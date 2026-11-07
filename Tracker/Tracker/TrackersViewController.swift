@@ -65,8 +65,9 @@ final class TrackersViewController: UIViewController {
         super.init(nibName: nil, bundle: nil)
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+        nil
     }
 
     override func viewDidLoad() {
@@ -153,7 +154,7 @@ final class TrackersViewController: UIViewController {
         navigationItem.title = "Трекеры"
 
         let addButton = UIBarButtonItem(
-            image: UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(weight: .semibold)),
+            image: UIImage(systemName: SystemImageName.plus, withConfiguration: UIImage.SymbolConfiguration(weight: .semibold)),
             style: .plain,
             target: self,
             action: #selector(didTapAdd)

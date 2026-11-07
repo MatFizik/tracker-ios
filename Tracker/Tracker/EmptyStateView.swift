@@ -33,8 +33,9 @@ final class EmptyStateView: UIView {
         setupLayout()
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
-        fatalError("Empty state error")
+        nil
     }
 
     private func setupLayout() {

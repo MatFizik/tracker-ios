@@ -72,8 +72,9 @@ final class TrackerCell: UICollectionViewCell {
         setupLayout()
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+        nil
     }
 
     func configure(with tracker: Tracker, isCompleted: Bool, completedDays: Int) {
@@ -82,7 +83,7 @@ final class TrackerCell: UICollectionViewCell {
         titleLabel.text = tracker.name
         counterLabel.text = daysText(completedDays)
 
-        let symbolName = isCompleted ? "checkmark" : "plus"
+        let symbolName = isCompleted ? SystemImageName.checkmark : SystemImageName.plus
         let configuration = UIImage.SymbolConfiguration(pointSize: 12, weight: .bold)
         doneButton.setImage(UIImage(systemName: symbolName, withConfiguration: configuration), for: .normal)
         doneButton.backgroundColor = tracker.color
