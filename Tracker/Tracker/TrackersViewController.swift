@@ -7,7 +7,10 @@
 
 import UIKit
 
-final class TrackerViewController: UIViewController {
+final class TrackersViewController: UIViewController {
+    private var categories: [TrackerCategory] = []
+    private var completedTrackers: [TrackerRecord] = []
+    private var currentDate = Date()
 
     private let searchField: UISearchTextField = {
         let field = UISearchTextField()
@@ -27,6 +30,25 @@ final class TrackerViewController: UIViewController {
         view.backgroundColor = .white
         buildAppBar()
         buildView()
+    }
+    
+    private func addTracker(_ tracker: Tracker, toCategory title: String) {
+        if categories.contains(where: {$0.title == title}) {
+            categories = categories.map {
+                $0.title == title ? TrackerCategory(title: $0.title, trackers: $0.trackers + [tracker]) : $0
+            }
+        } else {
+                categories = categories + [TrackerCategory(title: title, trackers: [tracker])]
+            }
+        }
+    
+    private func toggleCompletion(of trackerId: UUID) {
+        let calendar = Calendar.current
+        if completedTrackers.contains(where: { $0.trackerId == trackerId && calendar.isDate($0.date, inSameDayAs: currentDate) }) {
+            completedTrackers.removeAll { $0.trackerId == trackerId && calendar.isDate($0.date, inSameDayAs: currentDate) }
+        } else {
+            completedTrackers.append(TrackerRecord(trackerId: trackerId, date: currentDate))
+        }
     }
 
     private func buildAppBar() {

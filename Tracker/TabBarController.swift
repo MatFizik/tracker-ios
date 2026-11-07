@@ -12,7 +12,7 @@ final class TabBarController: UITabBarController {
         super.viewDidLoad()
         setupAppearance()
         viewControllers = [
-            makeTab(controller: TrackerViewController(), title: "Трекеры", imageName: "circle_icon"),
+            makeTab(controller: TrackersViewController(), title: "Трекеры", imageName: "circle_icon"),
             makeTab(controller: StatisticsViewController(), title: "Статистика", imageName: "rabbit_icon")
         ]
     }
