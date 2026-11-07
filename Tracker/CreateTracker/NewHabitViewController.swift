@@ -26,7 +26,6 @@ final class NewHabitViewController: UIViewController {
         }
     }
 
-    // Выбора эмодзи и цвета в этом спринте нет — берём случайные значения из макета
     private static let emojis = ["🙂", "😻", "🌺", "🐶", "❤️", "😱", "😇", "😡", "🥶", "🤔", "🙌", "🍔", "🥦", "🏓", "🥇", "🎸", "🏝", "😪"]
     private static let colors: [UIColor] = [
         UIColor(red: 253 / 255, green: 76 / 255, blue: 73 / 255, alpha: 1),
@@ -122,6 +121,7 @@ final class NewHabitViewController: UIViewController {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(hideKeyboard))
         tap.cancelsTouchesInView = false
+        tap.delegate = self
         view.addGestureRecognizer(tap)
     }
 
@@ -191,6 +191,14 @@ final class NewHabitViewController: UIViewController {
     }
 }
 
+// MARK: - UIGestureRecognizerDelegate
+
+extension NewHabitViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        !(touch.view is UIControl)
+    }
+}
+
 // MARK: - UITextFieldDelegate
 
 extension NewHabitViewController: UITextFieldDelegate {
@@ -245,7 +253,7 @@ extension NewHabitViewController: UITableViewDelegate {
 
         switch Option.allCases[indexPath.row] {
         case .category:
-            break // экран категорий появится в следующих спринтах
+            break
         case .schedule:
             openSchedule()
         }
