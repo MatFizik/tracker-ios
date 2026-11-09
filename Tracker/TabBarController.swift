@@ -8,11 +8,27 @@
 import UIKit
 
 final class TabBarController: UITabBarController {
+    private let coreDataStack: CoreDataStack
+
+    init(coreDataStack: CoreDataStack) {
+        self.coreDataStack = coreDataStack
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupAppearance()
         viewControllers = [
-            makeTab(controller: TrackersViewController(), title: "Трекеры", imageName: "circle_icon"),
+            makeTab(
+                controller: TrackersViewController(coreDataStack: coreDataStack),
+                title: "Трекеры",
+                imageName: "circle_icon"
+            ),
             makeTab(controller: StatisticsViewController(), title: "Статистика", imageName: "rabbit_icon")
         ]
     }

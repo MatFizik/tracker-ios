@@ -15,6 +15,11 @@ final class TrackersViewController: UIViewController {
         static let headerHeight: CGFloat = 46
     }
 
+    // Слой данных: контроллер работает только со Store и структурами, без Core Data
+    private let trackerStore: TrackerStore
+    private let categoryStore: TrackerCategoryStore
+    private let recordStore: TrackerRecordStore
+
     // Экрана выбора категории пока нет — все трекеры попадают в категорию по умолчанию
     private let defaultCategoryTitle = "Важное"
 
@@ -52,32 +57,59 @@ final class TrackersViewController: UIViewController {
         return view
     }()
 
+    init(coreDataStack: CoreDataStack) {
+        let categoryStore = TrackerCategoryStore(coreDataStack: coreDataStack)
+        self.categoryStore = categoryStore
+        self.trackerStore = TrackerStore(coreDataStack: coreDataStack, categoryStore: categoryStore)
+        self.recordStore = TrackerRecordStore(coreDataStack: coreDataStack)
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
         buildAppBar()
         buildView()
-        filterTrackers()
+
+        trackerStore.delegate = self
+        categoryStore.delegate = self
+        recordStore.delegate = self
+        reloadFromStores()
     }
 
     // MARK: - Data
 
+    // Берёт актуальные данные из Store. Вызывается при старте и каждый раз,
+    // когда NSFetchedResultsController сообщает об изменениях в Core Data.
+    private func reloadFromStores() {
+        categories = trackerStore.categories
+        completedTrackers = recordStore.records
+        filterTrackers()
+    }
+
     private func addTracker(_ tracker: Tracker, toCategory title: String) {
-        if categories.contains(where: { $0.title == title }) {
-            categories = categories.map {
-                $0.title == title ? TrackerCategory(title: $0.title, trackers: $0.trackers + [tracker]) : $0
-            }
-        } else {
-            categories = categories + [TrackerCategory(title: title, trackers: [tracker])]
+        do {
+            try trackerStore.addNewTracker(tracker, toCategoryWithTitle: title)
+        } catch {
+            print("Не удалось сохранить трекер: \(error)")
         }
     }
 
     private func toggleCompletion(of trackerId: UUID) {
         let record = makeRecord(for: trackerId)
-        if completedTrackers.contains(record) {
-            completedTrackers.remove(record)
-        } else {
-            completedTrackers.insert(record)
+        do {
+            if completedTrackers.contains(record) {
+                try recordStore.deleteRecord(record)
+            } else {
+                try recordStore.addRecord(record)
+            }
+        } catch {
+            print("Не удалось обновить отметку: \(error)")
         }
     }
 
@@ -122,7 +154,7 @@ final class TrackersViewController: UIViewController {
         navigationItem.title = "Трекеры"
 
         let addButton = UIBarButtonItem(
-            image: UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(weight: .semibold)),
+            image: UIImage(systemName: SystemImageName.plus, withConfiguration: UIImage.SymbolConfiguration(weight: .semibold)),
             style: .plain,
             target: self,
             action: #selector(didTapAdd)
@@ -300,7 +332,27 @@ extension TrackersViewController: TrackerCellDelegate {
         else { return }
 
         let tracker = visibleCategories[indexPath.section].trackers[indexPath.item]
+        // Экран обновится сам: TrackerRecordStore сообщит об изменении через делегата
         toggleCompletion(of: tracker.id)
-        collectionView.reloadItems(at: [indexPath])
+    }
+}
+
+// MARK: - Обновления из Core Data
+
+extension TrackersViewController: TrackerStoreDelegate {
+    func trackerStoreDidUpdate(_ store: TrackerStore) {
+        reloadFromStores()
+    }
+}
+
+extension TrackersViewController: TrackerCategoryStoreDelegate {
+    func trackerCategoryStoreDidUpdate(_ store: TrackerCategoryStore) {
+        reloadFromStores()
+    }
+}
+
+extension TrackersViewController: TrackerRecordStoreDelegate {
+    func trackerRecordStoreDidUpdate(_ store: TrackerRecordStore) {
+        reloadFromStores()
     }
 }
