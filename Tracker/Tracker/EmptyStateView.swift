@@ -19,7 +19,6 @@ final class EmptyStateView: UIView {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "Что будем отслеживать?"
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .blackDay
         label.textAlignment = .center
@@ -28,8 +27,9 @@ final class EmptyStateView: UIView {
         return label
     }()
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(text: String = "Что будем отслеживать?") {
+        super.init(frame: .zero)
+        titleLabel.text = text
         setupLayout()
     }
 

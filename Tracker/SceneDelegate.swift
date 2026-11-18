@@ -12,12 +12,31 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
     private let coreDataStack = CoreDataStack()
+    private let onboardingStorage = OnboardingStorage()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = TabBarController(coreDataStack: coreDataStack)
+        window?.rootViewController = makeRootViewController()
         window?.makeKeyAndVisible()
+    }
+
+    private func makeRootViewController() -> UIViewController {
+        guard !onboardingStorage.isOnboardingShown else {
+            return TabBarController(coreDataStack: coreDataStack)
+        }
+
+        let viewModel = OnboardingViewModel(storage: onboardingStorage)
+        viewModel.onFinish = { [weak self] in
+            self?.showMainScreen()
+        }
+        return OnboardingViewController(viewModel: viewModel)
+    }
+
+    private func showMainScreen() {
+        guard let window else { return }
+        window.rootViewController = TabBarController(coreDataStack: coreDataStack)
+        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {

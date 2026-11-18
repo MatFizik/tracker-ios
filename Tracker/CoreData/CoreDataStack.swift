@@ -8,11 +8,16 @@
 import CoreData
 
 final class CoreDataStack {
+
+    // MARK: - Properties
+
     let persistentContainer: NSPersistentContainer
 
     var context: NSManagedObjectContext {
         persistentContainer.viewContext
     }
+
+    // MARK: - Initialization
 
     init(modelName: String = "Tracker") {
         persistentContainer = NSPersistentContainer(name: modelName)
@@ -23,6 +28,8 @@ final class CoreDataStack {
         }
         persistentContainer.viewContext.automaticallyMergesChangesFromParent = true
     }
+
+    // MARK: - Public Methods
 
     func saveContext() {
         guard context.hasChanges else { return }
