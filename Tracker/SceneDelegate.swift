@@ -12,7 +12,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
     private let coreDataStack = CoreDataStack()
-    private let onboardingShownKey = "isOnboardingShown"
+    private let onboardingStorage = OnboardingStorage()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
@@ -22,20 +22,19 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     private func makeRootViewController() -> UIViewController {
-        guard !UserDefaults.standard.bool(forKey: onboardingShownKey) else {
+        guard !onboardingStorage.isOnboardingShown else {
             return TabBarController(coreDataStack: coreDataStack)
         }
 
-        let onboardingViewController = OnboardingViewController()
-        onboardingViewController.onFinish = { [weak self] in
-            self?.finishOnboarding()
+        let viewModel = OnboardingViewModel(storage: onboardingStorage)
+        viewModel.onFinish = { [weak self] in
+            self?.showMainScreen()
         }
-        return onboardingViewController
+        return OnboardingViewController(viewModel: viewModel)
     }
 
-    private func finishOnboarding() {
+    private func showMainScreen() {
         guard let window else { return }
-        UserDefaults.standard.set(true, forKey: onboardingShownKey)
         window.rootViewController = TabBarController(coreDataStack: coreDataStack)
         UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
     }

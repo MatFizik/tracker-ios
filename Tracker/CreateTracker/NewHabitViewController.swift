@@ -7,12 +7,7 @@
 
 import UIKit
 
-protocol NewHabitViewControllerDelegate: AnyObject {
-    func newHabitViewController(_ controller: NewHabitViewController, didCreate tracker: Tracker)
-}
-
 final class NewHabitViewController: UIViewController {
-    weak var delegate: NewHabitViewControllerDelegate?
 
     private enum Option: CaseIterable {
         case category
@@ -37,19 +32,7 @@ final class NewHabitViewController: UIViewController {
         }
     }
 
-    private let categoryTitle: String
-    private var schedule: Set<Weekday> = [] {
-        didSet {
-            tableView.reloadData()
-            updateCreateButtonState()
-        }
-    }
-    private var selectedEmojiIndex: Int? {
-        didSet { updateCreateButtonState() }
-    }
-    private var selectedColorIndex: Int? {
-        didSet { updateCreateButtonState() }
-    }
+    private let viewModel: NewHabitViewModel
 
     private let titleLabel: UILabel = {
         let label = UILabel()
@@ -132,8 +115,8 @@ final class NewHabitViewController: UIViewController {
         return stack
     }()
 
-    init(categoryTitle: String) {
-        self.categoryTitle = categoryTitle
+    init(viewModel: NewHabitViewModel) {
+        self.viewModel = viewModel
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -147,7 +130,8 @@ final class NewHabitViewController: UIViewController {
         view.backgroundColor = .white
         setupActions()
         setupLayout()
-        updateCreateButtonState()
+        bind()
+        updateView()
     }
 
     // MARK: - Setup
@@ -228,7 +212,7 @@ final class NewHabitViewController: UIViewController {
             emojiCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             emojiCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             emojiCollectionView.heightAnchor.constraint(
-                equalToConstant: Layout.collectionHeight(itemsCount: TrackerPalette.emojis.count)
+                equalToConstant: Layout.collectionHeight(itemsCount: viewModel.emojis.count)
             ),
 
             colorTitleLabel.topAnchor.constraint(equalTo: emojiCollectionView.bottomAnchor, constant: 36),
@@ -238,7 +222,7 @@ final class NewHabitViewController: UIViewController {
             colorCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             colorCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             colorCollectionView.heightAnchor.constraint(
-                equalToConstant: Layout.collectionHeight(itemsCount: TrackerPalette.colors.count)
+                equalToConstant: Layout.collectionHeight(itemsCount: viewModel.colors.count)
             ),
 
             buttonsStack.topAnchor.constraint(equalTo: colorCollectionView.bottomAnchor, constant: 40),
@@ -249,31 +233,35 @@ final class NewHabitViewController: UIViewController {
         ])
     }
 
-    // MARK: - State
+    // MARK: - Binding
 
-    private var trimmedName: String {
-        (nameField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    private func bind() {
+        viewModel.onStateChanged = { [weak self] in
+            self?.updateView()
+        }
     }
 
-    private func updateCreateButtonState() {
-        createButton.isEnabled = !trimmedName.isEmpty
-            && !schedule.isEmpty
-            && selectedEmojiIndex != nil
-            && selectedColorIndex != nil
+    private func updateView() {
+        tableView.reloadData()
+        emojiCollectionView.reloadData()
+        colorCollectionView.reloadData()
+        createButton.isEnabled = viewModel.isCreateEnabled
+    }
+
+    private func openCategories() {
+        let categoryListViewController = CategoryListViewController(viewModel: viewModel.makeCategoryListViewModel())
+        present(categoryListViewController, animated: true)
     }
 
     private func openSchedule() {
-        let scheduleViewController = ScheduleViewController(selectedDays: schedule)
-        scheduleViewController.onDone = { [weak self] days in
-            self?.schedule = days
-        }
+        let scheduleViewController = ScheduleViewController(viewModel: viewModel.makeScheduleViewModel())
         present(scheduleViewController, animated: true)
     }
 
     // MARK: - Actions
 
     @objc private func didChangeName() {
-        updateCreateButtonState()
+        viewModel.didChangeName(nameField.text ?? "")
     }
 
     @objc private func hideKeyboard() {
@@ -285,20 +273,8 @@ final class NewHabitViewController: UIViewController {
     }
 
     @objc private func didTapCreate() {
-        guard
-            createButton.isEnabled,
-            let emojiIndex = selectedEmojiIndex,
-            let colorIndex = selectedColorIndex
-        else { return }
-
-        let tracker = Tracker(
-            id: UUID(),
-            name: trimmedName,
-            color: TrackerPalette.colors[colorIndex],
-            emoji: TrackerPalette.emojis[emojiIndex],
-            schedule: schedule
-        )
-        delegate?.newHabitViewController(self, didCreate: tracker)
+        guard viewModel.isCreateEnabled else { return }
+        viewModel.createTracker()
         dismiss(animated: true)
     }
 }
@@ -323,7 +299,7 @@ extension NewHabitViewController: UITextFieldDelegate {
 
     func textFieldShouldClear(_ textField: UITextField) -> Bool {
         textField.text = ""
-        updateCreateButtonState()
+        viewModel.didChangeName("")
         return false
     }
 }
@@ -346,9 +322,9 @@ extension NewHabitViewController: UITableViewDataSource {
         let option = Option.allCases[indexPath.row]
         switch option {
         case .category:
-            cell.configure(title: option.title, subtitle: categoryTitle)
+            cell.configure(title: option.title, subtitle: viewModel.categoryTitle)
         case .schedule:
-            cell.configure(title: option.title, subtitle: schedule.isEmpty ? nil : schedule.scheduleText)
+            cell.configure(title: option.title, subtitle: viewModel.scheduleText)
         }
         return cell
     }
@@ -367,7 +343,7 @@ extension NewHabitViewController: UITableViewDelegate {
 
         switch Option.allCases[indexPath.row] {
         case .category:
-            break // экран категорий появится в следующих спринтах
+            openCategories()
         case .schedule:
             openSchedule()
         }
@@ -378,7 +354,7 @@ extension NewHabitViewController: UITableViewDelegate {
 
 extension NewHabitViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        collectionView === emojiCollectionView ? TrackerPalette.emojis.count : TrackerPalette.colors.count
+        collectionView === emojiCollectionView ? viewModel.emojis.count : viewModel.colors.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -390,8 +366,8 @@ extension NewHabitViewController: UICollectionViewDataSource {
                 return UICollectionViewCell()
             }
             cell.configure(
-                emoji: TrackerPalette.emojis[indexPath.item],
-                isSelected: indexPath.item == selectedEmojiIndex
+                emoji: viewModel.emojis[indexPath.item],
+                isSelected: indexPath.item == viewModel.selectedEmojiIndex
             )
             return cell
         }
@@ -403,8 +379,8 @@ extension NewHabitViewController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
         cell.configure(
-            color: TrackerPalette.colors[indexPath.item],
-            isSelected: indexPath.item == selectedColorIndex
+            color: viewModel.colors[indexPath.item],
+            isSelected: indexPath.item == viewModel.selectedColorIndex
         )
         return cell
     }
@@ -415,11 +391,10 @@ extension NewHabitViewController: UICollectionViewDataSource {
 extension NewHabitViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         if collectionView === emojiCollectionView {
-            selectedEmojiIndex = indexPath.item
+            viewModel.didSelectEmoji(at: indexPath.item)
         } else {
-            selectedColorIndex = indexPath.item
+            viewModel.didSelectColor(at: indexPath.item)
         }
-        collectionView.reloadData()
     }
 
     func collectionView(

@@ -8,9 +8,7 @@
 import UIKit
 
 final class ScheduleViewController: UIViewController {
-    var onDone: ((Set<Weekday>) -> Void)?
-
-    private var selectedDays: Set<Weekday>
+    private let viewModel: ScheduleViewModel
 
     private let titleLabel: UILabel = {
         let label = UILabel()
@@ -39,8 +37,8 @@ final class ScheduleViewController: UIViewController {
 
     private let doneButton = ActionButton(title: "Готово", style: .primary)
 
-    init(selectedDays: Set<Weekday>) {
-        self.selectedDays = selectedDays
+    init(viewModel: ScheduleViewModel) {
+        self.viewModel = viewModel
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -76,7 +74,7 @@ final class ScheduleViewController: UIViewController {
     }
 
     @objc private func didTapDone() {
-        onDone?(selectedDays)
+        viewModel.didTapDone()
         dismiss(animated: true)
     }
 }
@@ -85,7 +83,7 @@ final class ScheduleViewController: UIViewController {
 
 extension ScheduleViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        Weekday.allCases.count
+        viewModel.days.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -96,14 +94,10 @@ extension ScheduleViewController: UITableViewDataSource {
             return UITableViewCell()
         }
 
-        let day = Weekday.allCases[indexPath.row]
-        cell.configure(day: day, isOn: selectedDays.contains(day))
+        let day = viewModel.days[indexPath.row]
+        cell.configure(day: day, isOn: viewModel.isSelected(day))
         cell.onToggle = { [weak self] isOn in
-            if isOn {
-                self?.selectedDays.insert(day)
-            } else {
-                self?.selectedDays.remove(day)
-            }
+            self?.viewModel.didToggle(day, isOn: isOn)
         }
         return cell
     }

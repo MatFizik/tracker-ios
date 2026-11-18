@@ -69,7 +69,22 @@ final class TrackerCategoryStore: NSObject {
         return category
     }
 
+    func addCategory(title: String) throws {
+        _ = try categoryCoreData(withTitle: title)
+        try saveContext()
+    }
+
     // MARK: - Private Methods
+
+    private func saveContext() throws {
+        guard context.hasChanges else { return }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
 
     private func makeCategory(from categoryCoreData: TrackerCategoryCD) -> TrackerCategory? {
         guard let title = categoryCoreData.title else { return nil }

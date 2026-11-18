@@ -2,12 +2,9 @@ import UIKit
 
 final class OnboardingViewController: UIPageViewController, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
 
-    var onFinish: (() -> Void)?
+    private let viewModel: OnboardingViewModel
 
-    private lazy var pages: [UIViewController] = [
-        OnboardingPageViewController(imageName: "onboarding_blue", text: "Отслеживайте только то, что хотите"),
-        OnboardingPageViewController(imageName: "onboarding_red", text: "Даже если это не литры воды и йога")
-    ]
+    private lazy var pages: [UIViewController] = viewModel.pages.map(OnboardingPageViewController.init(page:))
 
     private lazy var pageControl: UIPageControl = {
         let pageControl = UIPageControl()
@@ -27,7 +24,8 @@ final class OnboardingViewController: UIPageViewController, UIPageViewController
         return button
     }()
 
-    init() {
+    init(viewModel: OnboardingViewModel) {
+        self.viewModel = viewModel
         super.init(transitionStyle: .scroll, navigationOrientation: .horizontal)
     }
 
@@ -96,6 +94,6 @@ final class OnboardingViewController: UIPageViewController, UIPageViewController
     }
 
     @objc private func didTapFinishButton() {
-        onFinish?()
+        viewModel.didTapFinish()
     }
 }

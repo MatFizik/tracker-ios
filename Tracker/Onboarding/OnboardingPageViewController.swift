@@ -2,11 +2,10 @@ import UIKit
 
 final class OnboardingPageViewController: UIViewController {
 
-    private let imageName: String
-    private let text: String
+    private let page: OnboardingPage
 
     private lazy var backgroundImageView: UIImageView = {
-        let imageView = UIImageView(image: UIImage(named: imageName))
+        let imageView = UIImageView(image: UIImage(named: page.imageName))
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -15,7 +14,7 @@ final class OnboardingPageViewController: UIViewController {
 
     private lazy var titleLabel: UILabel = {
         let label = UILabel()
-        label.text = text
+        label.text = page.text
         label.font = .systemFont(ofSize: 32, weight: .bold)
         label.textColor = .blackDay
         label.textAlignment = .center
@@ -24,9 +23,8 @@ final class OnboardingPageViewController: UIViewController {
         return label
     }()
 
-    init(imageName: String, text: String) {
-        self.imageName = imageName
-        self.text = text
+    init(page: OnboardingPage) {
+        self.page = page
         super.init(nibName: nil, bundle: nil)
     }
 

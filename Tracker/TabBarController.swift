@@ -25,7 +25,7 @@ final class TabBarController: UITabBarController {
         setupAppearance()
         viewControllers = [
             makeTab(
-                controller: TrackersViewController(coreDataStack: coreDataStack),
+                controller: TrackersViewController(viewModel: TrackersViewModel(coreDataStack: coreDataStack)),
                 title: "Трекеры",
                 imageName: "circle_icon"
             ),
