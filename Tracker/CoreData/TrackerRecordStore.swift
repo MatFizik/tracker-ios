@@ -7,17 +7,29 @@
 
 import CoreData
 
-protocol TrackerRecordStoreDelegate: AnyObject {
-    func trackerRecordStoreDidUpdate(_ store: TrackerRecordStore)
-}
-
 // Доступ к сущности TrackerRecordCD. Наружу отдаёт и принимает только структуры TrackerRecord.
 // Изменения в отметках отслеживает NSFetchedResultsController и сообщает о них делегату.
 final class TrackerRecordStore: NSObject {
+
+    // MARK: - Properties
+
     weak var delegate: TrackerRecordStoreDelegate?
+
+    var records: Set<TrackerRecord> {
+        let records = fetchedResultsController.fetchedObjects?.compactMap { recordCoreData -> TrackerRecord? in
+            guard
+                let date = recordCoreData.date,
+                let trackerId = recordCoreData.tracker?.id
+            else { return nil }
+            return TrackerRecord(trackerId: trackerId, date: date)
+        }
+        return Set(records ?? [])
+    }
 
     private let context: NSManagedObjectContext
     private let fetchedResultsController: NSFetchedResultsController<TrackerRecordCD>
+
+    // MARK: - Initialization
 
     convenience init(coreDataStack: CoreDataStack) {
         self.init(context: coreDataStack.context)
@@ -42,22 +54,18 @@ final class TrackerRecordStore: NSObject {
         do {
             try fetchedResultsController.performFetch()
         } catch {
-            print("Не удалось загрузить отметки: \(error)")
+            assertionFailure("Не удалось загрузить отметки: \(error)")
         }
     }
 
-    var records: Set<TrackerRecord> {
-        let records = fetchedResultsController.fetchedObjects?.compactMap { recordCoreData -> TrackerRecord? in
-            guard
-                let date = recordCoreData.date,
-                let trackerId = recordCoreData.tracker?.id
-            else { return nil }
-            return TrackerRecord(trackerId: trackerId, date: date)
-        }
-        return Set(records ?? [])
-    }
+    // MARK: - Public Methods
 
     func addRecord(_ record: TrackerRecord) throws {
+        // Одна отметка на трекер в день: если такая уже есть, второй раз не сохраняем
+        let request = fetchRequest(for: record)
+        request.fetchLimit = 1
+        guard try context.count(for: request) == 0 else { return }
+
         guard let trackerCoreData = try trackerCoreData(withId: record.trackerId) else { return }
 
         let recordCoreData = TrackerRecordCD(context: context)
@@ -67,15 +75,21 @@ final class TrackerRecordStore: NSObject {
     }
 
     func deleteRecord(_ record: TrackerRecord) throws {
+        try context.fetch(fetchRequest(for: record)).forEach { context.delete($0) }
+        try saveContext()
+    }
+
+    // MARK: - Private Methods
+
+    // Запрос отметок конкретного трекера за конкретный день
+    private func fetchRequest(for record: TrackerRecord) -> NSFetchRequest<TrackerRecordCD> {
         let request: NSFetchRequest<TrackerRecordCD> = TrackerRecordCD.fetchRequest()
         request.predicate = NSPredicate(
             format: "tracker.id == %@ AND %K == %@",
             record.trackerId as CVarArg,
             #keyPath(TrackerRecordCD.date), record.date as NSDate
         )
-
-        try context.fetch(request).forEach { context.delete($0) }
-        try saveContext()
+        return request
     }
 
     // Находит трекер, к которому нужно привязать запись

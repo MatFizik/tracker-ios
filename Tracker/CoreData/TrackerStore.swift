@@ -8,16 +8,29 @@
 import CoreData
 import UIKit
 
-protocol TrackerStoreDelegate: AnyObject {
-    func trackerStoreDidUpdate(_ store: TrackerStore)
-}
-
 final class TrackerStore: NSObject {
+
+    // MARK: - Properties
+
     weak var delegate: TrackerStoreDelegate?
+
+    // Секции контроллера — это категории, объекты внутри секции — трекеры этой категории
+    var categories: [TrackerCategory] {
+        guard let sections = fetchedResultsController.sections else { return [] }
+
+        return sections.compactMap { section in
+            let trackersCoreData = section.objects as? [TrackerCD] ?? []
+            let trackers = trackersCoreData.compactMap { $0.toTracker() }
+            guard !trackers.isEmpty else { return nil }
+            return TrackerCategory(title: section.name, trackers: trackers)
+        }
+    }
 
     private let context: NSManagedObjectContext
     private let categoryStore: TrackerCategoryStore
     private let fetchedResultsController: NSFetchedResultsController<TrackerCD>
+
+    // MARK: - Initialization
 
     convenience init(coreDataStack: CoreDataStack, categoryStore: TrackerCategoryStore) {
         self.init(context: coreDataStack.context, categoryStore: categoryStore)
@@ -45,21 +58,11 @@ final class TrackerStore: NSObject {
         do {
             try fetchedResultsController.performFetch()
         } catch {
-            print("Не удалось загрузить трекеры: \(error)")
+            assertionFailure("Не удалось загрузить трекеры: \(error)")
         }
     }
 
-    // Секции контроллера — это категории, объекты внутри секции — трекеры этой категории
-    var categories: [TrackerCategory] {
-        guard let sections = fetchedResultsController.sections else { return [] }
-
-        return sections.compactMap { section in
-            let trackersCoreData = section.objects as? [TrackerCD] ?? []
-            let trackers = trackersCoreData.compactMap { $0.toTracker() }
-            guard !trackers.isEmpty else { return nil }
-            return TrackerCategory(title: section.name, trackers: trackers)
-        }
-    }
+    // MARK: - Public Methods
 
     func addNewTracker(_ tracker: Tracker, toCategoryWithTitle categoryTitle: String) throws {
         let trackerCoreData = TrackerCD(context: context)
@@ -71,6 +74,8 @@ final class TrackerStore: NSObject {
         trackerCoreData.category = try categoryStore.categoryCoreData(withTitle: categoryTitle)
         try saveContext()
     }
+
+    // MARK: - Private Methods
 
     private func saveContext() throws {
         do {

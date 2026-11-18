@@ -223,7 +223,6 @@ final class TrackersViewController: UIViewController {
 extension TrackersViewController: NewHabitViewControllerDelegate {
     func newHabitViewController(_ controller: NewHabitViewController, didCreate tracker: Tracker) {
         addTracker(tracker, toCategory: defaultCategoryTitle)
-        filterTrackers()
     }
 }
 

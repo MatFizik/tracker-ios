@@ -7,17 +7,22 @@
 
 import CoreData
 
-protocol TrackerCategoryStoreDelegate: AnyObject {
-    func trackerCategoryStoreDidUpdate(_ store: TrackerCategoryStore)
-}
-
 // Доступ к сущности TrackerCategoryCD. Наружу отдаёт только структуры TrackerCategory.
 // Изменения в категориях отслеживает NSFetchedResultsController и сообщает о них делегату.
 final class TrackerCategoryStore: NSObject {
+
+    // MARK: - Properties
+
     weak var delegate: TrackerCategoryStoreDelegate?
+
+    var categories: [TrackerCategory] {
+        fetchedResultsController.fetchedObjects?.compactMap(makeCategory) ?? []
+    }
 
     private let context: NSManagedObjectContext
     private let fetchedResultsController: NSFetchedResultsController<TrackerCategoryCD>
+
+    // MARK: - Initialization
 
     convenience init(coreDataStack: CoreDataStack) {
         self.init(context: coreDataStack.context)
@@ -42,13 +47,11 @@ final class TrackerCategoryStore: NSObject {
         do {
             try fetchedResultsController.performFetch()
         } catch {
-            print("Не удалось загрузить категории: \(error)")
+            assertionFailure("Не удалось загрузить категории: \(error)")
         }
     }
 
-    var categories: [TrackerCategory] {
-        fetchedResultsController.fetchedObjects?.compactMap(makeCategory) ?? []
-    }
+    // MARK: - Public Methods
 
     // Находит категорию по названию или создаёт новую. Используется TrackerStore при создании трекера.
     func categoryCoreData(withTitle title: String) throws -> TrackerCategoryCD {
@@ -65,6 +68,8 @@ final class TrackerCategoryStore: NSObject {
         category.title = title
         return category
     }
+
+    // MARK: - Private Methods
 
     private func makeCategory(from categoryCoreData: TrackerCategoryCD) -> TrackerCategory? {
         guard let title = categoryCoreData.title else { return nil }
